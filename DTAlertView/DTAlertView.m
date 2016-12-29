@@ -24,20 +24,30 @@
 #if __has_feature(objc_arc)
 
 #define ARC_MODE_USED
-#define DTAutorelease( expression )     expression
-#define DTRelease( expression )
-#define DTRetain( expression )          expression
-#define DTBlockCopy( expression )       expression
-#define DTBlockRelease( expression )    expression
+#define DTAutorelease(expression)     expression
+#define DTRelease(expression)
+#define DTRetain(expression)          expression
+#define DTBlockCopy(expression)       expression
+#define DTBlockRelease(expression)    expression
 
 #else
 
 #define ARC_MODE_NOT_USED
-#define DTAutorelease( expression )     [expression autorelease]
-#define DTRelease( expression )         [expression release]
-#define DTRetain( expression )          [expression retain]
-#define DTBlockCopy( expression )       Block_copy( expression )
-#define DTBlockRelease( expression )    Block_release( expression )
+#define DTAutorelease(expression)     [expression autorelease]
+#define DTRelease(expression)         [expression release]
+#define DTRetain(expression)          [expression retain]
+#define DTBlockCopy(expression)       Block_copy(expression)
+#define DTBlockRelease(expression)    Block_release(expression)
+
+#endif
+
+#if __IPHONE_OS_VERSION_MIN_REQUIRED >= 60000
+
+#define DTTextAlignmentCenter   NSTextAlignmentCenter
+
+#else
+
+#define DTTextAlignmentCenter   UITextAlignmentCenter
 
 #endif
 
@@ -83,8 +93,7 @@ static DTBackgroundView *singletion = nil;
 
 @implementation DTBackgroundView
 
-+ (DTInstancetype)currentBackground
-{
++ (DTInstancetype)currentBackground {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         singletion = [DTBackgroundView new];
@@ -109,8 +118,7 @@ static DTBackgroundView *singletion = nil;
     return bounds;
 }
 
-- (DTInstancetype)init
-{
+- (DTInstancetype)init {
     CGRect screenRect = [self iOS7StyleScreenBounds];
     
     self = [super initWithFrame:screenRect];
@@ -135,8 +143,7 @@ static DTBackgroundView *singletion = nil;
     return self;
 }
 
-- (void)drawRect:(CGRect)rect
-{
+- (void)drawRect:(CGRect)rect {
     [super drawRect:rect];
     
     CGRect screenRect = [self iOS7StyleScreenBounds];
@@ -148,20 +155,18 @@ static DTBackgroundView *singletion = nil;
     [_alertWindow setFrame:screenRect];
     [self setFrame:screenRect];
     
-    [_alertViews enumerateObjectsUsingBlock:^(UIView *alertView, NSUInteger idx, BOOL *stop) {
+    [_alertViews enumerateObjectsUsingBlock: ^(UIView *alertView, NSUInteger idx, BOOL *stop) {
         CGPoint backgroundCenter = CGPointMake(CGRectGetMidX(screenRect), CGRectGetMidY(screenRect));
         
         [alertView setCenter:backgroundCenter];
     }];
 }
 
-- (NSArray *)allAlertView
-{
+- (NSArray *)allAlertView {
     return _alertViews;
 }
 
-- (void)setAlpha:(CGFloat)alpha
-{
+- (void)setAlpha:(CGFloat)alpha {
     if ([_alertViews count] > 0) {
         alpha = 1.0f;
     }
@@ -169,8 +174,7 @@ static DTBackgroundView *singletion = nil;
     [super setAlpha:alpha];
 }
 
-- (void)setHidden:(BOOL)hidden
-{
+- (void)setHidden:(BOOL)hidden {
     if ([_alertViews count] > 0) {
         hidden = NO;
     }
@@ -182,7 +186,8 @@ static DTBackgroundView *singletion = nil;
     if (hidden) {
         [_alertWindow resignKeyWindow];
         [_previousKeyWindow makeKeyAndVisible];
-    } else {
+    }
+    else {
         [_previousKeyWindow resignKeyWindow];
         [_alertWindow makeKeyAndVisible];
     }
@@ -190,8 +195,7 @@ static DTBackgroundView *singletion = nil;
     [self setAlpha:1.0f];
 }
 
-- (void)addSubview:(UIView *)view
-{
+- (void)addSubview:(UIView *)view {
     [super addSubview:view];
     
     DTAlertView *alertView = _alertViews.lastObject;
@@ -204,8 +208,7 @@ static DTBackgroundView *singletion = nil;
     [self setNeedsDisplay];
 }
 
-- (void)willRemoveSubview:(UIView *)subview
-{
+- (void)willRemoveSubview:(UIView *)subview {
     [super willRemoveSubview:subview];
     
     if ([subview isKindOfClass:[DTAlertView class]]) {
@@ -224,7 +227,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 @interface DTAlertView ()
 {
-    id<DTAlertViewDelegate> _delegate;
+    id <DTAlertViewDelegate> _delegate;
     
     DTAlertViewButtonClickedBlock _clickedBlock;
     DTAlertViewTextDidChangeBlock _textChangeBlock;
@@ -246,7 +249,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     // Button Titles
     NSString *_cancelButtonTitle;
     NSInteger _cancelButtonIndex;
-    NSString *_positiveButtonTitle;
+    NSArray *_positiveButtonTitleArray;
     BOOL _positiveButtonEnable;
     NSString *_clickedButtonTitle;
     
@@ -267,19 +270,17 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 @implementation DTAlertView
 
-+ (DTInstancetype)alertViewWithTitle:(NSString *)title message:(NSString *)message delegate:(id<DTAlertViewDelegate>)delegate cancelButtonTitle:(NSString *)cancelButtonTitle positiveButtonTitle:(NSString *)positiveButtonTitle
-{
++ (DTInstancetype)alertViewWithTitle:(NSString *)title message:(NSString *)message delegate:(id <DTAlertViewDelegate> )delegate cancelButtonTitle:(NSString *)cancelButtonTitle positiveButtonTitle:(NSArray *)positiveButtonTitleArray {
     DTAlertView *alertView = [[DTAlertView alloc] initWithTitle:title
                                                         message:message
                                                        delegate:delegate
                                               cancelButtonTitle:cancelButtonTitle
-                                            positiveButtonTitle:positiveButtonTitle];
+                                            positiveButtonTitle:positiveButtonTitleArray];
     
     return DTAutorelease(alertView);
 }
 
-- (DTInstancetype)initWithTitle:(NSString *)title message:(NSString *)message delegate:(id<DTAlertViewDelegate>)delegate cancelButtonTitle:(NSString *)cancelButtonTitle positiveButtonTitle:(NSString *)positiveButtonTitle
-{
+- (DTInstancetype)initWithTitle:(NSString *)title message:(NSString *)message delegate:(id <DTAlertViewDelegate> )delegate cancelButtonTitle:(NSString *)cancelButtonTitle positiveButtonTitle:(NSArray *)positiveButtonTitleArray {
     self = [super init];
     
     if (self == nil) return nil;
@@ -293,13 +294,13 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     _message = DTRetain(message);
     
     _cancelButtonTitle = DTRetain(cancelButtonTitle);
-    _positiveButtonTitle = DTRetain(positiveButtonTitle);
+    _positiveButtonTitleArray = DTRetain(positiveButtonTitleArray);
     _positiveButtonEnable = YES;
     
     _backgroundView = nil;
     _visible = NO;
-    _progressTintColor = [[UIColor alloc] initWithRed:0 green:122.0f/255.0f blue:1 alpha:1];
-    _buttonTextColor = [[UIColor alloc] initWithRed:0 green:122.0f/255.0f blue:1 alpha:1];
+    _progressTintColor = [[UIColor alloc] initWithRed:0 green:122.0f / 255.0f blue:1 alpha:1];
+    _buttonTextColor = [[UIColor alloc] initWithRed:0 green:122.0f / 255.0f blue:1 alpha:1];
     
     _keyboardIsShown = NO;
     
@@ -314,13 +315,12 @@ const static CGFloat kMotionEffectExtent = 15.0f;
                               title:(NSString *)title
                             message:(NSString *)message
                   cancelButtonTitle:(NSString *)cancelButtonTitle
-                positiveButtonTitle:(NSString *)positiveButtonTitle
-{
+                positiveButtonTitle:(NSArray *)positiveButtonTitleArray {
     DTAlertView *alertView = [[DTAlertView alloc] initWithBlock:block
                                                           title:title
                                                         message:message
                                               cancelButtonTitle:cancelButtonTitle
-                                            positiveButtonTitle:positiveButtonTitle];
+                                            positiveButtonTitle:positiveButtonTitleArray];
     
     return DTAutorelease(alertView);
 }
@@ -329,8 +329,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
                           title:(NSString *)title
                         message:(NSString *)message
               cancelButtonTitle:(NSString *)cancelButtonTitle
-            positiveButtonTitle:(NSString *)positiveButtonTitle
-{
+            positiveButtonTitle:(NSArray *)positiveButtonTitleArray {
     self = [super init];
     
     if (self == nil) return nil;
@@ -346,37 +345,34 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     _animationWhenDismiss = DTAlertViewAnimationDefault;
     
     _cancelButtonTitle = DTRetain(cancelButtonTitle);
-    _positiveButtonTitle = DTRetain(positiveButtonTitle);
+    _positiveButtonTitleArray = DTRetain(positiveButtonTitleArray);
     _positiveButtonEnable = YES;
     
     _backgroundView = nil;
     _visible = NO;
-    _progressTintColor = [[UIColor alloc] initWithRed:0 green:122.0f/255.0f blue:1 alpha:1];
-    _buttonTextColor = [[UIColor alloc] initWithRed:0 green:122.0f/255.0f blue:1 alpha:1];
+    _progressTintColor = [[UIColor alloc] initWithRed:0 green:122.0f / 255.0f blue:1 alpha:1];
+    _buttonTextColor = [[UIColor alloc] initWithRed:0 green:122.0f / 255.0f blue:1 alpha:1];
     
     _keyboardIsShown = NO;
     
     _showForInputPassword = NO;
     
     [self setCancelButtonIndex];
-
+    
     return self;
 }
 
-- (void)layoutSubviews
-{
+- (void)layoutSubviews {
     [super layoutSubviews];
     
     if (_blurToolbar != nil) {
         [_blurToolbar setFrame:self.bounds];
     }
-    
 }
 
 #ifdef ARC_MODE_NOT_USED
 
-- (void)dealloc
-{
+- (void)dealloc {
     if (_clickedBlock != nil) {
         Block_release(_clickedBlock);
     }
@@ -401,9 +397,9 @@ const static CGFloat kMotionEffectExtent = 15.0f;
         _buttonTextColor = nil;
     }
     
-    if (_positiveButtonTitle != nil) {
-        [_positiveButtonTitle release];
-        _positiveButtonTitle = nil;
+    if (_positiveButtonTitleArray != nil) {
+        [_positiveButtonTitleArray release];
+        _positiveButtonTitleArray = nil;
     }
     
     if (_clickedButtonTitle != nil) {
@@ -437,10 +433,8 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 #pragma mark - Property Methods
 
-- (void)setDelegate:(id<DTAlertViewDelegate>)delegate
-{
+- (void)setDelegate:(id <DTAlertViewDelegate> )delegate {
     if (_clickedBlock != nil) {
-        
         NSLog(@"%s-%d:Block is set, can't use delegate.", __func__, __LINE__);
         
         return;
@@ -449,13 +443,11 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     _delegate = delegate;
 }
 
-- (id<DTAlertViewDelegate>)delegate
-{
+- (id <DTAlertViewDelegate> )delegate {
     return _delegate;
 }
 
-- (void)setTitle:(NSString *)title
-{
+- (void)setTitle:(NSString *)title {
     if ([_title isEqualToString:title]) {
         return;
     }
@@ -471,13 +463,11 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     }
 }
 
-- (NSString *)title
-{
+- (NSString *)title {
     return _title;
 }
 
-- (void)setMessage:(NSString *)message
-{
+- (void)setMessage:(NSString *)message {
     if ([_message isEqualToString:message]) {
         return;
     }
@@ -493,13 +483,11 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     }
 }
 
-- (NSString *)message
-{
+- (NSString *)message {
     return _message;
 }
 
-- (void)setAlertViewMode:(DTAlertViewMode)alertViewMode
-{
+- (void)setAlertViewMode:(DTAlertViewMode)alertViewMode {
     _alertViewMode = alertViewMode;
     
     if (_visible) {
@@ -507,48 +495,39 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     }
 }
 
-- (DTAlertViewMode)alertViewMode
-{
+- (DTAlertViewMode)alertViewMode {
     return _alertViewMode;
 }
 
-- (void)setDismissAnimationWhenButtonClicked:(DTAlertViewAnimation)dismissAnimationWhenButtonClicked
-{
+- (void)setDismissAnimationWhenButtonClicked:(DTAlertViewAnimation)dismissAnimationWhenButtonClicked {
     _animationWhenDismiss = dismissAnimationWhenButtonClicked;
 }
 
-- (DTAlertViewAnimation)dismissAnimationWhenButtonClicked
-{
+- (DTAlertViewAnimation)dismissAnimationWhenButtonClicked {
     return _animationWhenDismiss;
 }
 
-- (NSInteger)cancelButtonIndex
-{
+- (NSInteger)cancelButtonIndex {
     return _cancelButtonIndex;
 }
 
-- (BOOL)isVisible
-{
+- (BOOL)isVisible {
     return _visible;
 }
 
-- (NSString *)clickedButtonTitle
-{
+- (NSString *)clickedButtonTitle {
     return _clickedButtonTitle;
 }
 
-- (void)setCornerRadius:(CGFloat)cornerRadius
-{
+- (void)setCornerRadius:(CGFloat)cornerRadius {
     [self.layer setCornerRadius:cornerRadius];
 }
 
-- (CGFloat)cornerRadius
-{
+- (CGFloat)cornerRadius {
     return self.layer.cornerRadius;
 }
 
-- (void)setBackgroundView:(UIView *)backgroundView
-{
+- (void)setBackgroundView:(UIView *)backgroundView {
     if (backgroundView == nil) {
         [self setBackgroundColor:kDefaultBGColor];
         
@@ -574,27 +553,24 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     [self insertSubview:_backgroundView atIndex:0];
 }
 
-- (UIView *)backgroundView
-{
-    
+- (UIView *)backgroundView {
     return _backgroundView;
 }
 
-- (UITextField *)textField
-{
+- (UITextField *)textField {
     return _textField;
 }
 
-- (void)setButtonTextColor:(UIColor *)buttonTextColor
-{
+- (void)setButtonTextColor:(UIColor *)buttonTextColor {
     if (_buttonTextColor != nil) {
         DTRelease(_buttonTextColor);
     }
     
     if (buttonTextColor != nil) {
         _buttonTextColor = DTRetain(buttonTextColor);
-    } else {
-        _buttonTextColor = [[UIColor alloc] initWithRed:0 green:122.0f/255.0f blue:1 alpha:1];
+    }
+    else {
+        _buttonTextColor = [[UIColor alloc] initWithRed:0 green:122.0f / 255.0f blue:1 alpha:1];
     }
     
     if (_visible && [self checkButtonTitleExist]) {
@@ -603,20 +579,20 @@ const static CGFloat kMotionEffectExtent = 15.0f;
             [cancelButton setTitleColor:_buttonTextColor forState:UIControlStateNormal];
         }
         
-        if (_positiveButtonTitle != nil) {
-            UIButton *positiveButton = (UIButton *)[self viewWithTag:_cancelButtonIndex + 2];
-            [positiveButton setTitleColor:_buttonTextColor forState:UIControlStateNormal];
+        if (_positiveButtonTitleArray != nil) {
+            for (int positiveButtonIndex = 0; positiveButtonIndex < [_positiveButtonTitleArray count]; positiveButtonIndex++) {
+                UIButton *positiveButton = (UIButton *)[self viewWithTag:_cancelButtonIndex + (2 + positiveButtonIndex)];
+                [positiveButton setTitleColor:_buttonTextColor forState:UIControlStateNormal];
+            }
         }
     }
 }
 
-- (UIColor *)buttonTextColor
-{
+- (UIColor *)buttonTextColor {
     return _buttonTextColor;
 }
 
-- (void)setProgressBarColor:(UIColor *)progressBarColor
-{
+- (void)setProgressBarColor:(UIColor *)progressBarColor {
     // Only set at DTAlertViewModeProgress and DTAlertViewModeDuoProgress
     if (_alertViewMode != DTAlertViewModeProgress && _alertViewMode != DTAlertViewModeDuoProgress) {
         return;
@@ -628,8 +604,9 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     
     if (progressBarColor != nil) {
         _progressTintColor = DTRetain(progressBarColor);
-    } else {
-        _progressTintColor = [[UIColor alloc] initWithRed:0 green:122.0f/255.0f blue:1 alpha:1];
+    }
+    else {
+        _progressTintColor = [[UIColor alloc] initWithRed:0 green:122.0f / 255.0f blue:1 alpha:1];
     }
     
     if (_visible && (_alertViewMode == DTAlertViewModeProgress || _alertViewMode == DTAlertViewModeDuoProgress)) {
@@ -643,8 +620,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     }
 }
 
-- (UIColor *)progressBarColor
-{
+- (UIColor *)progressBarColor {
     return _progressTintColor;
 }
 
@@ -652,8 +628,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 #pragma mark Blur Background
 
-- (void)setBlurBackgroundWithColor:(UIColor *)color alpha:(CGFloat)alpha
-{
+- (void)setBlurBackgroundWithColor:(UIColor *)color alpha:(CGFloat)alpha {
     if (_blurToolbar != nil) {
         return;
     }
@@ -670,8 +645,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 #pragma mark Set Positive Button enable
 
-- (void)setPositiveButtonEnable:(BOOL)enable
-{
+- (void)setPositiveButtonEnable:(BOOL)enable {
     _positiveButtonEnable = enable;
     
     if (_visible) {
@@ -682,8 +656,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 #pragma mark Set Label Under Progress view
 
-- (void)setProgressStatus:(DTProgressStatus)status
-{
+- (void)setProgressStatus:(DTProgressStatus)status {
     // Only set value at DTAlertViewModeDuoProgress
     if (_alertViewMode != DTAlertViewModeDuoProgress) {
         return;
@@ -692,7 +665,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     _status = status;
     
     if (_visible) {
-        CGFloat progress = (CGFloat)status.current/(CGFloat)status.total;
+        CGFloat progress = (CGFloat)status.current / (CGFloat)status.total;
         
         UIProgressView *firstProgress = (UIProgressView *)[self viewWithTag:kFirstProgressTag];
         [firstProgress setProgress:progress];
@@ -704,8 +677,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     }
 }
 
-- (void)setPercentage:(CGFloat)percentage
-{
+- (void)setPercentage:(CGFloat)percentage {
     // Only set value at DTAlertViewModeProgress and DTAlertViewModeDuoProgress
     if (_alertViewMode != DTAlertViewModeProgress && _alertViewMode != DTAlertViewModeDuoProgress) {
         return;
@@ -743,8 +715,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 #pragma mark Show Alert View Methods
 
-- (void)show
-{
+- (void)show {
     [self showWithAnimation:DTAlertViewAnimationDefault];
 }
 
@@ -755,8 +726,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     [self showWithAnimation:animation];
 }
 
-- (void)showWithAnimation:(DTAlertViewAnimation)animation
-{
+- (void)showWithAnimation:(DTAlertViewAnimation)animation {
 #ifndef DEBUG_MODE
     
     [self setClipsToBounds:YES];
@@ -765,10 +735,10 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     
     // If background color or background view not set, will set to default scenario.
     if (self.backgroundColor == nil && _backgroundView == nil) {
-        
         if ([UIToolbar instancesRespondToSelector:@selector(setBarTintColor:)]) {
             [self setBlurBackgroundWithColor:nil alpha:0];
-        } else {
+        }
+        else {
             [self setBackgroundColor:[UIColor whiteColor]];
         }
     }
@@ -826,8 +796,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     [self performSelector:@selector(showsCompletion) withObject:nil afterDelay:0.1f];
 }
 
-- (void)showsCompletion
-{
+- (void)showsCompletion {
     _visible = YES;
     
     [self.layer removeAnimationForKey:kAnimationShow];
@@ -843,23 +812,21 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 #pragma mark Dismiss Alert View Method
 
-+ (BOOL)dismissAllAlertView
-{
++ (BOOL)dismissAllAlertView {
     NSArray *alertViews = [[DTBackgroundView currentBackground] allAlertView];
     
     if ([alertViews count] == 0) {
         return NO;
     }
     
-    [alertViews enumerateObjectsUsingBlock:^(DTAlertView *alertView, NSUInteger idx, BOOL *stop) {
+    [alertViews enumerateObjectsUsingBlock: ^(DTAlertView *alertView, NSUInteger idx, BOOL *stop) {
         [alertView dismiss];
     }];
     
     return YES;
 }
 
-+ (BOOL)dismissAlertViewViaTitle:(NSString *)title
-{
++ (BOOL)dismissAlertViewViaTitle:(NSString *)title {
     NSArray *alertViews = [[DTBackgroundView currentBackground] allAlertView];
     
     if ([alertViews count] == 0) {
@@ -868,7 +835,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     
     __block BOOL isCorrespond = NO;
     
-    [alertViews enumerateObjectsUsingBlock:^(DTAlertView *alertView, NSUInteger idx, BOOL *stop) {
+    [alertViews enumerateObjectsUsingBlock: ^(DTAlertView *alertView, NSUInteger idx, BOOL *stop) {
         if ([alertView.title isEqualToString:title]) {
             [alertView dismiss];
             
@@ -879,8 +846,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     return isCorrespond;
 }
 
-+ (BOOL)dismissAlertViewViaMessage:(NSString *)message
-{
++ (BOOL)dismissAlertViewViaMessage:(NSString *)message {
     NSArray *alertViews = [[DTBackgroundView currentBackground] allAlertView];
     
     if ([alertViews count] == 0) {
@@ -889,7 +855,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     
     __block BOOL isCorrespond = NO;
     
-    [alertViews enumerateObjectsUsingBlock:^(DTAlertView *alertView, NSUInteger idx, BOOL *stop) {
+    [alertViews enumerateObjectsUsingBlock: ^(DTAlertView *alertView, NSUInteger idx, BOOL *stop) {
         if ([alertView.message isEqualToString:message]) {
             [alertView dismiss];
             
@@ -900,16 +866,14 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     return isCorrespond;
 }
 
-- (void)dismiss
-{
+- (void)dismiss {
     [self dismissWithAnimation:DTAlertViewAnimationDefault];
 }
 
-- (void)dismissWithAnimation:(DTAlertViewAnimation)animation
-{
+- (void)dismissWithAnimation:(DTAlertViewAnimation)animation {
     // Remove notification for rotate
     [self removeRotationHandleNotification];
-
+    
     if (_delegate != nil && [_delegate respondsToSelector:@selector(alertViewWillDismiss:)]) {
         [_delegate alertViewWillDismiss:self];
     }
@@ -956,17 +920,16 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     [self performSelector:@selector(dismissCompletion) withObject:nil afterDelay:dismissAnimation.duration];
 }
 
-- (void)dismissCompletion
-{
+- (void)dismissCompletion {
     // Dismiss self
     [self removeFromSuperview];
     
     // Remove dismiss animation
     [self.layer removeAnimationForKey:kAnimationDismiss];
     
-    [UIView animateWithDuration:0.2f animations:^{
+    [UIView animateWithDuration:0.2f animations: ^{
         [[DTBackgroundView currentBackground] setAlpha:0.0f];
-    } completion:^(BOOL finished) {
+    } completion: ^(BOOL finished) {
         [[DTBackgroundView currentBackground] setHidden:YES];
     }];
     
@@ -979,8 +942,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 #pragma mark Shake AlertView Method
 
-- (void)shakeAlertView
-{
+- (void)shakeAlertView {
     CAAnimation *shakeAnimation = [self shakeAnimation];
     
     [self.layer removeAnimationForKey:kAnimationShake];
@@ -989,15 +951,13 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 #pragma mark Set TextField Did Cahnge Block
 
-- (void)setTextFieldDidChangeBlock:(DTAlertViewTextDidChangeBlock)textBlock
-{
+- (void)setTextFieldDidChangeBlock:(DTAlertViewTextDidChangeBlock)textBlock {
     _textChangeBlock = DTBlockCopy(textBlock);
 }
 
 #pragma mark - Set Views
 
-- (void)setViews
-{
+- (void)setViews {
     //MARK: Labels
     
     // Label default value.
@@ -1008,7 +968,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     UILabel *titleLabel = [[UILabel alloc] init];
     [titleLabel setText:_title];
     [titleLabel setTextColor:[UIColor blackColor]];
-    [titleLabel setTextAlignment:NSTextAlignmentCenter];
+    [titleLabel setTextAlignment:DTTextAlignmentCenter];
     [titleLabel setFont:[UIFont boldSystemFontOfSize:17.0f]];
     [titleLabel setTag:kTitleLableTag];
     
@@ -1034,7 +994,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     UILabel *messageLabel = [[UILabel alloc] init];
     [messageLabel setText:_message];
     [messageLabel setTextColor:[UIColor blackColor]];
-    [messageLabel setTextAlignment:NSTextAlignmentCenter];
+    [messageLabel setTextAlignment:DTTextAlignmentCenter];
     [messageLabel setFont:[UIFont systemFontOfSize:15.0f]];
     [messageLabel setTag:kMessageLabelTag];
     
@@ -1053,16 +1013,14 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     CGFloat messageMaxYPosition = 0.0f;
     
     if (CGRectGetHeight(messageLabel.frame) > kMessageLabelLimitHight) {
-        
         messageMaxYPosition = [self setupScrollViewToContentMessage:messageLabel];
-        
-    } else {
-        
+    }
+    else {
         [self addSubview:messageLabel];
         
         messageMaxYPosition = CGRectGetMaxY(messageLabel.frame);
     }
-
+    
 #ifdef DEBUG_MODE
     
     [messageLabel setBackgroundColor:[UIColor greenColor]];
@@ -1076,7 +1034,6 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     buttonsField.size = CGSizeMake(self.frame.size.width, 45.0f);
     
     switch (_alertViewMode) {
-            
         case DTAlertViewModeNormal:
             buttonsField.origin.y = messageMaxYPosition + 20.0f;
             
@@ -1097,7 +1054,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
             [_textField setCenter:CGPointMake(CGRectGetMidX(self.bounds), _textField.center.y)];
             
             if ([_textField respondsToSelector:@selector(setTintColor:)]) {
-                [_textField setTintColor:[UIColor colorWithRed:0 green:122.0f/255.0f blue:1 alpha:1]];
+                [_textField setTintColor:[UIColor colorWithRed:0 green:122.0f / 255.0f blue:1 alpha:1]];
             }
             
             [self addSubview:_textField];
@@ -1110,7 +1067,6 @@ const static CGFloat kMotionEffectExtent = 15.0f;
             if (![self checkButtonTitleExist]) {
                 [self resizeViewWithLastRect:_textField.frame];
             }
-            
         }
             break;
             
@@ -1156,7 +1112,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
             
         case DTAlertViewModeDuoProgress:
         {
-            CGFloat progress = (CGFloat)_status.current/(CGFloat)_status.total;
+            CGFloat progress = (CGFloat)_status.current / (CGFloat)_status.total;
             
             // 1st Progress View
             UIProgressView *firstProgress = [self setProgressViewWithFrame:CGRectMake(0, messageMaxYPosition + 10.0f, labelMaxWidth, 2.0f)];
@@ -1240,18 +1196,36 @@ const static CGFloat kMotionEffectExtent = 15.0f;
         return;
     }
     
-    UIView *buttonBackgroundView = [[UIView alloc] initWithFrame:CGRectMake(CGRectGetMinX(buttonsField), CGRectGetMinY(buttonsField) - 1.0f, CGRectGetWidth(buttonsField), CGRectGetHeight(buttonsField) + 1.0f)];
+    
+    //取總共顯示按鈕的數量。
+    int buttonCount;
+    if (_cancelButtonTitle != nil) {
+        buttonCount = (int)[_positiveButtonTitleArray count] + 1;
+    }
+    else {
+        buttonCount = (int)[_positiveButtonTitleArray count];
+    }
+    
+    
+    UIView *buttonBackgroundView;
+    //按鈕背景加長，依照顯示按鈕大於 2 而改變按鈕擺放風格。
+    if (buttonCount > 2) {
+        buttonBackgroundView = [[UIView alloc] initWithFrame:CGRectMake(CGRectGetMinX(buttonsField), CGRectGetMinY(buttonsField) - 1.0f, CGRectGetWidth(buttonsField), CGRectGetHeight(buttonsField) + (([_positiveButtonTitleArray count] + 1) * 1.0f) + CGRectGetHeight(buttonsField) * [_positiveButtonTitleArray count])];
+    }
+    else {
+        buttonBackgroundView = [[UIView alloc] initWithFrame:CGRectMake(CGRectGetMinX(buttonsField), CGRectGetMinY(buttonsField) - 1.0f, CGRectGetWidth(buttonsField), CGRectGetHeight(buttonsField) + 1.0f)];
+    }
     [buttonBackgroundView setBackgroundColor:[UIColor colorWithWhite:0.5f alpha:0.8f]];
     [buttonBackgroundView setTag:kButtonBGViewTag];
-    
     [self addSubview:buttonBackgroundView];
     DTRelease(buttonBackgroundView);
     
     CGFloat buttonWidth;
     
-    if (_cancelButtonTitle != nil && _positiveButtonTitle != nil) {
+    if (_cancelButtonTitle != nil && [_positiveButtonTitleArray count] == 1) {
         buttonWidth = buttonsField.size.width / 2 - 0.5f;
-    } else {
+    }
+    else {
         buttonWidth = buttonsField.size.width;
     }
     
@@ -1264,6 +1238,12 @@ const static CGFloat kMotionEffectExtent = 15.0f;
         CGRect cancelButtonFrame = buttonsField;
         cancelButtonFrame.size.width = buttonWidth;
         
+        //把 cancel 按鈕放在最底下。
+        if (buttonCount > 2) {
+            cancelButtonFrame.size.height = (buttonBackgroundView.frame.size.height - (buttonCount * 1.0f)) / buttonCount;
+            cancelButtonFrame.origin.y = (buttonBackgroundView.frame.origin.y + buttonBackgroundView.frame.size.height) - cancelButtonFrame.size.height;
+        }
+        
         [cancelButton setFrame:cancelButtonFrame];
         [self addSubview:cancelButton];
         
@@ -1272,35 +1252,51 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 #endif
     }
     
+    
     // Positive Button
-    if (_positiveButtonTitle != nil) {
-        UIButton *positiveButton = [self setButtonWithTitle:_positiveButtonTitle];
-        [positiveButton setTitleColor:[UIColor grayColor] forState:UIControlStateDisabled];
-        [positiveButton setTag:_cancelButtonIndex + 2];
-        [positiveButton.titleLabel setFont:[UIFont systemFontOfSize:17.0f]];
-        [positiveButton setEnabled:_positiveButtonEnable];
-        [positiveButton addTarget:self action:@selector(buttonClicked:) forControlEvents:UIControlEventTouchUpInside];
-        
-        CGRect positiveButtonFrame = buttonsField;
-        positiveButtonFrame.size.width = buttonWidth;
-        
-        if (_cancelButtonTitle != nil) {
-            positiveButtonFrame.origin.x = buttonWidth + 1.0f;
+    if (_positiveButtonTitleArray != nil) {
+        for (int positiveButtonIndex = 0; positiveButtonIndex < [_positiveButtonTitleArray count]; positiveButtonIndex++) {
+            UIButton *positiveButton = [self setButtonWithTitle:_positiveButtonTitleArray[positiveButtonIndex]];
+            [positiveButton setTitleColor:[UIColor grayColor] forState:UIControlStateDisabled];
+            [positiveButton setTag:_cancelButtonIndex + 2 + positiveButtonIndex];
+            [positiveButton.titleLabel setFont:[UIFont systemFontOfSize:17.0f]];
+            [positiveButton setEnabled:_positiveButtonEnable];
+            [positiveButton addTarget:self action:@selector(buttonClicked:) forControlEvents:UIControlEventTouchUpInside];
+            
+            CGRect positiveButtonFrame = buttonsField;
+            positiveButtonFrame.size.width = buttonWidth;
+            
+            
+            if (buttonCount > 2) {
+                positiveButtonFrame.size.height = (buttonBackgroundView.frame.size.height - (buttonCount * 1.0f)) / buttonCount;
+            }
+            
+            
+            if (_cancelButtonTitle != nil && [_positiveButtonTitleArray count] == 1) {
+                positiveButtonFrame.origin.x = buttonWidth + 1.0f;
+            }
+            else if (_cancelButtonTitle != nil) {
+                positiveButtonFrame.origin.y = (buttonBackgroundView.frame.origin.y + buttonBackgroundView.frame.size.height) - (positiveButtonFrame.size.height * (positiveButtonIndex + 2)) - (positiveButtonIndex + 1) * 1.0f;
+            }
+            
+            [positiveButton setFrame:positiveButtonFrame];
+            [self addSubview:positiveButton];
         }
-        
-        [positiveButton setFrame:positiveButtonFrame];
-        [self addSubview:positiveButton];
         
 #ifdef DEBUG_MODE
         NSLog(@"Positive Button Frame: %@", NSStringFromCGRect(positiveButtonFrame));
 #endif
     }
     
+    //依照顯示按鈕大於 2，改變 AlertView frame 總高。
+    if (buttonCount > 2) {
+        buttonsField.size.height += CGRectGetHeight(buttonsField) * [_positiveButtonTitleArray count];
+    }
+    
     [self resizeViewWithLastRect:buttonsField];
 }
 
-- (CGFloat)setupScrollViewToContentMessage:(UILabel *)messageLabel
-{
+- (CGFloat)setupScrollViewToContentMessage:(UILabel *)messageLabel {
     // Prepare scroll view rect
     CGFloat labelWidth = CGRectGetWidth(messageLabel.frame);
     CGRect scrollViewRect = CGRectMake(0, 0, labelWidth, labelWidth);
@@ -1325,8 +1321,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 #pragma mark Default Views Setting
 
-- (UIProgressView *)setProgressViewWithFrame:(CGRect)frame
-{
+- (UIProgressView *)setProgressViewWithFrame:(CGRect)frame {
     UIProgressView *progress = [[UIProgressView alloc] initWithProgressViewStyle:UIProgressViewStyleDefault];
     [progress setFrame:frame];
     [progress setProgressTintColor:_progressTintColor];
@@ -1334,8 +1329,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     return DTAutorelease(progress);
 }
 
-- (UIButton *)setButtonWithTitle:(NSString *)buttonTitle
-{
+- (UIButton *)setButtonWithTitle:(NSString *)buttonTitle {
     UIColor *buttonColor = self.backgroundColor;
     
     if (buttonColor == nil) {
@@ -1353,23 +1347,20 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     return button;
 }
 
-- (BOOL)checkButtonTitleExist
-{
-    return (_cancelButtonTitle != nil || _positiveButtonTitle != nil);
+- (BOOL)checkButtonTitleExist {
+    return (_cancelButtonTitle != nil || _positiveButtonTitleArray != nil);
 }
 
 #pragma mark Layout Handle
 
-- (void)resizeViewWithLastRect:(CGRect)lastRect
-{
+- (void)resizeViewWithLastRect:(CGRect)lastRect {
     CGRect selfFrame = self.frame;
     selfFrame.size.height = CGRectGetMaxY(lastRect);
     
     [self setFrame:selfFrame];
 }
 
-- (void)renewLayout
-{
+- (void)renewLayout {
     UILabel *titleLabel = (UILabel *)[self viewWithTag:kTitleLableTag];
     [titleLabel removeFromSuperview];
     titleLabel = nil;
@@ -1418,7 +1409,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
         cancelButton = nil;
     }
     
-    if (_positiveButtonTitle != nil) {
+    if (_positiveButtonTitleArray != nil) {
         UIButton *positiveButton = (UIButton *)[self viewWithTag:_cancelButtonIndex + 2];
         [positiveButton removeFromSuperview];
         positiveButton = nil;
@@ -1429,8 +1420,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 #pragma mark Set Cancel Button Index
 
-- (void)setCancelButtonIndex
-{
+- (void)setCancelButtonIndex {
     if (_cancelButtonTitle == nil) {
         _cancelButtonIndex = -1;
         
@@ -1442,19 +1432,18 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 #pragma mark - Button Action
 
-- (IBAction)buttonClicked:(UIButton *)sender
-{
+- (IBAction)buttonClicked:(UIButton *)sender {
     [sender setEnabled:NO];
     
     // When using showForInputPassword: Method, delay 0.35 second to enable it.
     if ((sender.tag - 1) != _cancelButtonIndex && _showForInputPassword) {
         dispatch_time_t delayTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35f * NSEC_PER_SEC));
         
-        dispatch_after(delayTime, dispatch_get_main_queue(), ^(void){
-           [sender setEnabled:_showForInputPassword];
+        dispatch_after(delayTime, dispatch_get_main_queue(), ^(void) {
+            [sender setEnabled:_showForInputPassword];
         });
     }
-
+    
     if (_clickedButtonTitle != nil) {
         DTRelease(_clickedButtonTitle);
     }
@@ -1482,8 +1471,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 #pragma mark - TextField Action
 
-- (IBAction)textFieldDidBegin:(id)sender
-{
+- (IBAction)textFieldDidBegin:(id)sender {
     // Remove keyboard notification first
     [self removeKeyboarHandleNotification];
     
@@ -1491,8 +1479,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     [self registKeyboardHandleNotification];
 }
 
-- (IBAction)textFieldDidChange:(id)sender
-{
+- (IBAction)textFieldDidChange:(id)sender {
     /* Support Block at first priority */
     if (_textChangeBlock != nil) {
         _textChangeBlock(self, _textField.text);
@@ -1505,8 +1492,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     }
 }
 
-- (IBAction)textFieldDidEndEditing:(id)sender
-{
+- (IBAction)textFieldDidEndEditing:(id)sender {
     [_textField resignFirstResponder];
     
     // Remove notification
@@ -1515,8 +1501,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 #pragma mark - Handle Notification
 
-- (void)registRotationHandleNotification
-{
+- (void)registRotationHandleNotification {
 #ifdef DEBUG_MODE
     
     NSLog(@"** Regist rotation notification **");
@@ -1526,8 +1511,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didRotationHandle:) name:UIApplicationDidChangeStatusBarOrientationNotification object:nil];
 }
 
-- (void)removeRotationHandleNotification
-{
+- (void)removeRotationHandleNotification {
 #ifdef DEBUG_MODE
     
     NSLog(@"** Remove rotation notification **");
@@ -1537,8 +1521,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     [[NSNotificationCenter defaultCenter] removeObserver:self name:UIApplicationDidChangeStatusBarOrientationNotification object:nil];
 }
 
-- (void)registKeyboardHandleNotification
-{
+- (void)registKeyboardHandleNotification {
 #ifdef DEBUG_MODE
     
     NSLog(@"** Regist keyboard notification **");
@@ -1550,8 +1533,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillHide:) name:UIKeyboardWillHideNotification object:nil];
 }
 
-- (void)removeKeyboarHandleNotification
-{
+- (void)removeKeyboarHandleNotification {
 #ifdef DEBUG_MODE
     
     NSLog(@"** Remove keyboard notification **");
@@ -1565,34 +1547,30 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 #pragma mark KeyBoard Notification Methods
 
-- (IBAction)keyboardWillShow:(NSNotification *)notification
-{
+- (IBAction)keyboardWillShow:(NSNotification *)notification {
     _keyboardIsShown = YES;
 }
 
-- (IBAction)keyboardWillChangeFrame:(NSNotification *)notification
-{
+- (IBAction)keyboardWillChangeFrame:(NSNotification *)notification {
     NSDictionary *parameter = (NSDictionary *)notification.userInfo;
     
     [self setNewCenterWhenKeyboardApearWithKeyboardParameter:parameter];
 }
 
-- (IBAction)keyboardWillHide:(NSNotification *)notification
-{
+- (IBAction)keyboardWillHide:(NSNotification *)notification {
     _keyboardIsShown = NO;
     
     NSDictionary *parameter = (NSDictionary *)notification.userInfo;
     NSNumber *keyboardHideDuration = (NSNumber *)parameter[UIKeyboardAnimationDurationUserInfoKey];
     
-    [UIView animateWithDuration:[keyboardHideDuration doubleValue] animations:^{
+    [UIView animateWithDuration:[keyboardHideDuration doubleValue] animations: ^{
         // Move current view to center
         UIView *backGround = [self superview];
         [self setCenter:backGround.center];
     }];
 }
 
-- (void)setNewCenterWhenKeyboardApearWithKeyboardParameter:(NSDictionary *)parameter
-{
+- (void)setNewCenterWhenKeyboardApearWithKeyboardParameter:(NSDictionary *)parameter {
     UIApplication *application = [UIApplication sharedApplication];
     BOOL isPortrait = UIInterfaceOrientationIsPortrait(application.statusBarOrientation);
     
@@ -1610,20 +1588,19 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     UIScreen *screen = [UIScreen mainScreen];
     
     // Fixed auto change width and height on iOS8 issue.
-    CGFloat screenHeightOnLandcape = (CGRectGetWidth(screen.bounds) < CGRectGetHeight(screen.bounds)) ? CGRectGetWidth(screen.bounds) : CGRectGetHeight(screen.bounds) ;
+    CGFloat screenHeightOnLandcape = (CGRectGetWidth(screen.bounds) < CGRectGetHeight(screen.bounds)) ? CGRectGetWidth(screen.bounds) : CGRectGetHeight(screen.bounds);
     CGFloat keyboardHeightOnLandcape = (CGRectGetWidth(frame) < CGRectGetHeight(frame)) ? CGRectGetWidth(frame) : CGRectGetHeight(frame);
     
     // Keyboard offset value is screen height reduce keyboard height at portrait, when landscape value is keyboard width.
     CGFloat keyboardOffset = isPortrait ? CGRectGetHeight(screen.bounds) - CGRectGetHeight(frame) : screenHeightOnLandcape - keyboardHeightOnLandcape;
     CGPoint newCenter = [self calculateNewCenterWithKeyboardOffset:keyboardOffset];
     
-    [UIView animateWithDuration:duration animations:^{
+    [UIView animateWithDuration:duration animations: ^{
         [self setCenter:newCenter];
     }];
 }
 
-- (CGPoint)calculateNewCenterWithKeyboardOffset:(CGFloat)keyboardOffset
-{
+- (CGPoint)calculateNewCenterWithKeyboardOffset:(CGFloat)keyboardOffset {
     UIApplication *application = [UIApplication sharedApplication];
     BOOL isPortrait = UIInterfaceOrientationIsPortrait(application.statusBarOrientation);
     UIInterfaceOrientation orientation = application.statusBarOrientation;
@@ -1674,7 +1651,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 #ifdef DEBUG_MODE
     
     UIScreen *screen = [UIScreen mainScreen];
-    CGPoint screenCenter = (isPortrait) ? CGPointMake(CGRectGetMidX(screen.bounds), CGRectGetMidY(screen.bounds)) : CGPointMake(CGRectGetMidY(screen.bounds), CGRectGetMidX(screen.bounds)) ;
+    CGPoint screenCenter = (isPortrait) ? CGPointMake(CGRectGetMidX(screen.bounds), CGRectGetMidY(screen.bounds)) : CGPointMake(CGRectGetMidY(screen.bounds), CGRectGetMidX(screen.bounds));
     
     NSLog(@"Screen Center: %@", NSStringFromCGPoint(screenCenter));
     NSLog(@"New Center: %@", NSStringFromCGPoint(center));
@@ -1687,24 +1664,24 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 #pragma mark Rotation Notification Methods
 
 - (CGFloat)angleForCurrentOrientation {
+    // Calculate a rotation transform that matches the current interface orientation.
+    CGFloat angle = 0.0f;
+    UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
     
-	// Calculate a rotation transform that matches the current interface orientation.
-	CGFloat angle = 0.0f;
-	UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
-    
-	if (orientation == UIInterfaceOrientationPortraitUpsideDown) {
+    if (orientation == UIInterfaceOrientationPortraitUpsideDown) {
         angle = M_PI;
-    } else if (orientation == UIInterfaceOrientationLandscapeLeft) {
+    }
+    else if (orientation == UIInterfaceOrientationLandscapeLeft) {
         angle = -M_PI_2;
-    } else if (orientation == UIInterfaceOrientationLandscapeRight) {
+    }
+    else if (orientation == UIInterfaceOrientationLandscapeRight) {
         angle = M_PI_2;
     }
     
-	return angle;
+    return angle;
 }
 
-- (void)didRotationHandle:(NSNotification *)sender
-{
+- (void)didRotationHandle:(NSNotification *)sender {
     CGFloat angle = [self angleForCurrentOrientation];
     
     [self.layer removeAnimationForKey:kAnimationShake];
@@ -1713,8 +1690,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 #pragma mark - Motion Effect Setting
 
-- (void)setMotionEffect
-{
+- (void)setMotionEffect {
     if (![self respondsToSelector:@selector(setMotionEffects:)]) {
         return;
     }
@@ -1744,8 +1720,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 #define transformScale(scale) [NSValue valueWithCATransform3D:[self transform3DScale:scale]]
 
-- (CATransform3D)transform3DScale:(CGFloat)scale
-{
+- (CATransform3D)transform3DScale:(CGFloat)scale {
     // Add scale on current transform.
     CATransform3D currentTransfrom = CATransform3DScale(self.layer.transform, scale, scale, 1.0f);
     
@@ -1755,23 +1730,21 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 #define transformTranslateX(translate) [NSValue valueWithCATransform3D:[self transform3DTranslateX:translate]]
 #define transformTranslateY(translate) [NSValue valueWithCATransform3D:[self transform3DTranslateY:translate]]
 
-- (CATransform3D)transform3DTranslateX:(CGFloat)translate
-{
+- (CATransform3D)transform3DTranslateX:(CGFloat)translate {
     // Add scale on current transform.
     CATransform3D currentTransfrom = CATransform3DTranslate(self.layer.transform, translate, 1.0f, 1.0f);
     
     return currentTransfrom;
 }
 
-- (CATransform3D)transform3DTranslateY:(CGFloat)translate
-{
+- (CATransform3D)transform3DTranslateY:(CGFloat)translate {
     // Add scale on current transform.
     CATransform3D currentTransfrom = CATransform3DTranslate(self.layer.transform, 1.0f, translate, 1.0f);
     
     return currentTransfrom;
 }
 
-- (CAKeyframeAnimation *)animationWithValues:(NSArray*)values times:(NSArray*)times duration:(CGFloat)duration {
+- (CAKeyframeAnimation *)animationWithValues:(NSArray *)values times:(NSArray *)times duration:(CGFloat)duration {
     CAKeyframeAnimation *animation = [CAKeyframeAnimation animationWithKeyPath:@"transform"];
     [animation setValues:values];
     [animation setKeyTimes:times];
@@ -1783,26 +1756,26 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     return animation;
 }
 
-- (CGFloat)getMoveLengthForHeight
-{
+- (CGFloat)getMoveLengthForHeight {
     CGFloat moveLength;
     
     if (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation])) {
         moveLength = CGRectGetMidY([[DTBackgroundView currentBackground] bounds]) + CGRectGetMidY(self.bounds);
-    } else {
+    }
+    else {
         moveLength = CGRectGetMidX([[DTBackgroundView currentBackground] bounds]) + CGRectGetMidY(self.bounds);
     }
     
     return moveLength;
 }
 
-- (CGFloat)getMoveLengthForWidth
-{
+- (CGFloat)getMoveLengthForWidth {
     CGFloat moveLength;
     
     if (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation])) {
         moveLength = CGRectGetMidX([[DTBackgroundView currentBackground] bounds]) + CGRectGetMidX(self.bounds);
-    } else {
+    }
+    else {
         moveLength = CGRectGetMidY([[DTBackgroundView currentBackground] bounds]) + CGRectGetMidX(self.bounds);
     }
     
@@ -1811,36 +1784,31 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 #pragma mark Show Animations
 
-- (CAAnimation *)defaultShowsAnimation
-{
+- (CAAnimation *)defaultShowsAnimation {
     NSArray *frameValues = @[transformScale(0.1f), transformScale(1.15f), transformScale(0.9f), transformScale(1.0f)];
     NSArray *frameTimes = @[@(0.0f), @(0.5f), @(0.9f), @(1.0f)];
     return [self animationWithValues:frameValues times:frameTimes duration:0.2f];
 }
 
-- (CAAnimation *)sildeInTopAnimation
-{
+- (CAAnimation *)sildeInTopAnimation {
     NSArray *frameValues = @[transformTranslateY(-300.0f), transformTranslateY(0.0f)];
     NSArray *frameTimes = @[@(0.0f), @(1.0f)];
     return [self animationWithValues:frameValues times:frameTimes duration:0.2f];
 }
 
-- (CAAnimation *)sildeInBottomAnimation
-{
+- (CAAnimation *)sildeInBottomAnimation {
     NSArray *frameValues = @[transformTranslateY(300.0f), transformTranslateY(0.0f)];
     NSArray *frameTimes = @[@(0.0f), @(1.0f)];
     return [self animationWithValues:frameValues times:frameTimes duration:0.2f];
 }
 
-- (CAAnimation *)sildeInLeftAnimation
-{
+- (CAAnimation *)sildeInLeftAnimation {
     NSArray *frameValues = @[transformTranslateX(-300.0f), transformTranslateX(0.0f)];
     NSArray *frameTimes = @[@(0.0f), @(1.0f)];
     return [self animationWithValues:frameValues times:frameTimes duration:0.2f];
 }
 
-- (CAAnimation *)sildeInRightAnimation
-{
+- (CAAnimation *)sildeInRightAnimation {
     NSArray *frameValues = @[transformTranslateX(300.0f), transformTranslateX(0.0f)];
     NSArray *frameTimes = @[@(0.0f), @(1.0f)];
     return [self animationWithValues:frameValues times:frameTimes duration:0.2f];
@@ -1848,8 +1816,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 #pragma mark Dismiss Animations
 
-- (CAAnimation *)defaultDismissAnimation
-{
+- (CAAnimation *)defaultDismissAnimation {
     NSArray *frameValues = @[transformScale(1.0f), transformScale(0.95f), transformScale(0.5f)];
     NSArray *frameTimes = @[@(0.0f), @(0.5f), @(1.0f)];
     
@@ -1859,8 +1826,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     return animation;
 }
 
-- (CAAnimation *)sildeOutTopAnimation
-{
+- (CAAnimation *)sildeOutTopAnimation {
     CGFloat moveLength = [self getMoveLengthForHeight];
     
     NSArray *frameValues = @[transformTranslateY(0.0f), transformTranslateY(-moveLength)];
@@ -1868,8 +1834,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     return [self animationWithValues:frameValues times:frameTimes duration:0.2f];
 }
 
-- (CAAnimation *)sildeOutBottomAnimation
-{
+- (CAAnimation *)sildeOutBottomAnimation {
     CGFloat moveLength = [self getMoveLengthForHeight];
     
     NSArray *frameValues = @[transformTranslateY(0.0f), transformTranslateY(moveLength)];
@@ -1877,8 +1842,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     return [self animationWithValues:frameValues times:frameTimes duration:0.2f];
 }
 
-- (CAAnimation *)sildeOutLeftAnimation
-{
+- (CAAnimation *)sildeOutLeftAnimation {
     CGFloat moveLength = [self getMoveLengthForWidth];
     
     NSArray *frameValues = @[transformTranslateX(0.0f), transformTranslateX(-moveLength)];
@@ -1886,8 +1850,7 @@ const static CGFloat kMotionEffectExtent = 15.0f;
     return [self animationWithValues:frameValues times:frameTimes duration:0.2f];
 }
 
-- (CAAnimation *)sildeOutRightAnimation
-{
+- (CAAnimation *)sildeOutRightAnimation {
     CGFloat moveLength = [self getMoveLengthForWidth];
     
     NSArray *frameValues = @[transformTranslateX(0.0f), transformTranslateX(moveLength)];
@@ -1897,9 +1860,8 @@ const static CGFloat kMotionEffectExtent = 15.0f;
 
 #pragma mark Shake Animations
 
-- (CAAnimation *)shakeAnimation
-{
-    NSArray *frameValues = @[transformTranslateX(10.0f), transformTranslateX(-10.0f), transformTranslateX(6.0f), transformTranslateX(-6.0f),transformTranslateX(3.0f), transformTranslateX(-3.0f), transformTranslateX(0.0f)];
+- (CAAnimation *)shakeAnimation {
+    NSArray *frameValues = @[transformTranslateX(10.0f), transformTranslateX(-10.0f), transformTranslateX(6.0f), transformTranslateX(-6.0f), transformTranslateX(3.0f), transformTranslateX(-3.0f), transformTranslateX(0.0f)];
     NSArray *frameTimes = @[@(0.14f), @(0.28f), @(0.42f), @(0.57f), @(0.71f), @(0.85f), @(1.0f)];
     return [self animationWithValues:frameValues times:frameTimes duration:0.5f];
 }
